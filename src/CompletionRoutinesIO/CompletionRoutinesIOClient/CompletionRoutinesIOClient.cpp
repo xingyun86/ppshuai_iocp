@@ -397,24 +397,16 @@ private:
 
 CManageThreadHelper G_ManageThreadHelper;
 
-DWORD WSAInit(WSAData * pwsadata = (0))
+BOOL NetworkIoStartup(WSAData * pwsadata = (0), WORD wVersion = MAKEWORD(2, 2))
 {
 	WSADATA wsadata = { 0 };
 	WSAData * pwsad = pwsadata ? pwsadata : &wsadata;
 
-	if (WSAStartup(MAKEWORD(2, 2), pwsad) != 0)
-	{
-		printf("WSAStartup failed!\r\n");
-		return (-1L);
-	}
-
-	if (LOBYTE(pwsad->wVersion) != 2 || HIBYTE(pwsad->wVersion) != 2)
-	{
-		printf("Socket version failed!\r\n");
-		WSACleanup();
-		return (-1L);
-	}
-	return (0L);
+	return (WSAStartup(wVersion, pwsad) == 0);
+}
+BOOL NetworkIoCleanup()
+{
+	return (WSACleanup() == 0);
 }
 
 DWORD WINAPI WorkerThread(LPVOID lpParameter)
@@ -431,17 +423,17 @@ DWORD WINAPI WorkerThread(LPVOID lpParameter)
 	int reVal = connect(sock, (SOCKADDR*)&sockaddrin, sizeof(SOCKADDR));
 	if (reVal == SOCKET_ERROR)
 	{
-		printf("cannot client SERVER!   %d\n", WSAGetLastError());
+		printf("cannot connect SERVER! %d\n", WSAGetLastError());
 		return 0;
 	}
 
-	CHAR buf[DATA_BUFSIZE] = ("光阴的故事!\r\n");
+	CHAR buf[DATA_BUFSIZE] = ("光阴的故事!");
 	
 	while (pTH->IsThreadRunning())
 	{
 		if (SOCKET_ERROR == send(sock, buf, DATA_BUFSIZE, 0))
 		{
-			printf("cannot SEND message to server!   %d\n", WSAGetLastError());
+			printf("cannot SEND message to server! %d\n", WSAGetLastError());
 			//break;
 		}
 
@@ -449,12 +441,12 @@ DWORD WINAPI WorkerThread(LPVOID lpParameter)
 
 		if (SOCKET_ERROR == recv(sock, buf, DATA_BUFSIZE, 0))
 		{
-			printf("cannot RECV message to server!   %d\n", WSAGetLastError());
+			printf("cannot RECV message to server! %d\n", WSAGetLastError());
 			//break;
 		}
 
-		printf( buf );
-		Sleep(3000);
+		printf("接收到的消息:%s\r\n", buf);
+		Sleep(1000);
 	}
 
 	closesocket(sock);
@@ -502,7 +494,7 @@ int _tmain(int argc, _TCHAR ** argv)
 	signal(SIGABRT, signal_handle);
 	signal(SIGABRT_COMPAT, signal_handle);
 
-	WSAInit();
+	NetworkIoStartup();
 
 	for (int i = 0; i < MAX_CLIENT_CONNECT_NUM; i++)
 	{
@@ -512,6 +504,8 @@ int _tmain(int argc, _TCHAR ** argv)
 	G_ManageThreadHelper.StartAll();
 
 	G_ManageThreadHelper.CleanAll();
+
+	NetworkIoCleanup();
 
 	return 0;
 }
